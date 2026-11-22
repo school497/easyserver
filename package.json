@@ -1,0 +1,23 @@
+{
+  "name": "easyserver",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev -w @easyserver/client",
+    "dev:server": "npm run dev -w @easyserver/server-app",
+    "build:cli": "node scripts/build-cli.mjs",
+    "dist:client": "node scripts/package.mjs client",
+    "dist:server": "node scripts/package.mjs server",
+    "test": "node scripts/test/run.mjs",
+    "icons": "electron scripts/make-icons.cjs",
+    "test:live": "node scripts/test/run-e2e.mjs",
+    "test:plugins": "node scripts/test/run-plugins.mjs"
+  },
+  "devDependencies": {
+    "bun": "^1.1.38"
+  }
+}

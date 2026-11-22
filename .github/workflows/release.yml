@@ -1,0 +1,79 @@
+# Builds every download: macOS DMGs (Apple silicon + Intel), Windows installers, Linux AppImage/deb,
+# and the `easyserver` CLI for macOS, Linux and Windows. Run it from the Actions tab or push a v* tag.
+# Set repository secrets SUPABASE_URL and SUPABASE_ANON_KEY first; they're baked into the builds.
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14        # Apple silicon runner; builds both arm64 and x64 DMGs
+            flag: --mac
+          - os: windows-latest
+            flag: --win
+          - os: ubuntu-latest
+            flag: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/test/run.mjs
+      - run: node scripts/package.mjs client ${{ matrix.flag }}
+      - run: node scripts/package.mjs server ${{ matrix.flag }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            release/*/*.dmg
+            release/*/*.exe
+            release/*/*.AppImage
+            release/*/*.deb
+          if-no-files-found: error
+
+  cli:
+    runs-on: macos-14   # so the macOS binaries can be codesigned (ad-hoc) after cross-compiling
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/build-cli.mjs
+      - run: for f in dist/cli/easyserver-macos-*; do codesign --force --sign - "$f"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli
+          path: dist/cli/*
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, cli]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/**/*

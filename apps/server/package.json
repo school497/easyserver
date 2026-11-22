@@ -1,0 +1,28 @@
+{
+  "name": "@easyserver/server-app",
+  "productName": "EasyServer Server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "EasyServer Server",
+  "author": "EasyServer",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "web": "vite --config ../../scripts/vite.config.mjs",
+    "dev": "node ../../scripts/dev.mjs server",
+    "build": "node ../../scripts/build-app.mjs server",
+    "dist": "node ../../scripts/package.mjs server",
+    "dist:win": "node ../../scripts/package.mjs server --win",
+    "dist:mac": "node ../../scripts/package.mjs server --mac",
+    "dist:linux": "node ../../scripts/package.mjs server --linux"
+  },
+  "devDependencies": {
+    "@easyserver/ui": "1.0.0",
+    "@easyserver/core": "1.0.0",
+    "@easyserver/agent": "1.0.0",
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8",
+    "vite": "5.4.11",
+    "@vitejs/plugin-react": "4.3.4",
+    "esbuild": "0.24.0"
+  }
+}

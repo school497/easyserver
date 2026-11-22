@@ -1,0 +1,43 @@
+appId: dev.easyserver.server
+productName: EasyServer Server
+electronVersion: 33.2.1
+npmRebuild: false
+asar: true
+directories:
+  output: ../../release/server
+  buildResources: build
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+  - build/tray*.png
+mac:
+  category: public.app-category.developer-tools
+  icon: build/icon.png
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Ad-hoc signed (required on Apple silicon). Not notarized: first open with right-click > Open. Set a Developer ID here to notarize.
+  identity: "-"
+dmg:
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+win:
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-Setup-${version}-win-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+linux:
+  icon: build/icon.png
+  category: Network
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+  maintainer: EasyServer
