@@ -1,10 +1,11 @@
 {
   "name": "@easyserver/server-app",
   "productName": "EasyServer Server",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "EasyServer Server",
   "author": "EasyServer",
+  "homepage": "https://github.com/school497/easyserver",
   "main": "dist-electron/main.cjs",
   "scripts": {
     "web": "vite --config ../../scripts/vite.config.mjs",

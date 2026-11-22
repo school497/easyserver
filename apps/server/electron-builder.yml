@@ -37,6 +37,7 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
 linux:
+  executableName: easyserver-server
   icon: build/icon.png
   category: Network
   target:
@@ -46,3 +47,6 @@ linux:
       arch: [x64]
   artifactName: EasyServer-Server-${version}-linux-${arch}.${ext}
   maintainer: EasyServer
+
+deb:
+  packageName: easyserver-server

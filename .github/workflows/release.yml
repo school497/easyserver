@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14        # Apple silicon runner; builds arm64 and x64
+          - os: macos-latest    # Apple silicon runner; builds arm64 and x64
             flag: --mac
           - os: windows-latest
             flag: --win
@@ -54,7 +54,7 @@ jobs:
           if-no-files-found: error
 
   cli:
-    runs-on: macos-14   # so the macOS binaries can be codesigned (ad-hoc) after cross-compiling
+    runs-on: macos-latest   # so the macOS binaries can be codesigned (ad-hoc) after cross-compiling
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
