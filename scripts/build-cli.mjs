@@ -15,7 +15,10 @@ const targets = [
 const only = process.argv[2];
 const out = path.join(root, 'dist', 'cli');
 fs.mkdirSync(out, { recursive: true });
-const bun = path.join(path.dirname(createRequire(import.meta.url).resolve('bun/package.json')), 'bin', process.platform === 'win32' ? 'bun.exe' : 'bun');
+// The bun npm package installs its native binary as bin/bun.exe on every platform.
+const binDir = path.join(path.dirname(createRequire(import.meta.url).resolve('bun/package.json')), 'bin');
+const bun = ['bun.exe', 'bun'].map((n) => path.join(binDir, n)).find((p) => fs.existsSync(p));
+if (!bun) throw new Error('bun binary not found; run npm install');
 
 for (const [target, name] of targets) {
   if (only && !target.includes(only)) continue;
