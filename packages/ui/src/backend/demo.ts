@@ -164,9 +164,18 @@ export class DemoBackend implements Backend {
     switch (type) {
       case 'plugin.install': {
         const item = catalog.find((c) => c.sourceUrl === p.sourceUrl)!;
-        await new Promise((r) => setTimeout(r, 1200));
-        this.plugins[this.selected] = [...(this.plugins[this.selected] ?? []), row(this.selected, item.manifest, 'stopped')].sort((a, b) => a.name.localeCompare(b.name));
-        this.push({ plugins: [...this.plugins[this.selected]] });
+        // Mimic the agent: report file-by-file progress, then requirements, then finish.
+        const r = { ...row(this.selected, item.manifest, 'installing'), status_detail: 'Downloading files 0/8' };
+        this.plugins[this.selected] = [...(this.plugins[this.selected] ?? []), r].sort((a, b) => a.name.localeCompare(b.name));
+        const tickTo = async (detail: string, ms: number) => {
+          await new Promise((res) => setTimeout(res, ms));
+          this.update(item.manifest.id, { status_detail: detail });
+        };
+        for (let i = 1; i <= 8; i++) await tickTo(`Downloading files ${i}/8`, 260);
+        await tickTo('Checking requirements', 500);
+        await tickTo(`Installing ${item.manifest.name}`, 900);
+        await new Promise((res) => setTimeout(res, 700));
+        this.update(item.manifest.id, { status: 'stopped', status_detail: null });
         return { pluginId: item.manifest.id };
       }
       case 'plugin.uninstall':

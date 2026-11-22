@@ -264,8 +264,30 @@ export class Agent extends EventEmitter {
     this.timers.push(setInterval(() => this.prune(), 6 * 3600_000));
     this.drainBacklog();
     this.prune();
+    // Plugins that were running before an update always come back, whatever the autostart setting.
+    const resume = this.takeResumeList();
+    if (resume.length) {
+      this.log('info', `Resuming ${resume.length} plugin(s) after the update`);
+      await this.plugins.resume(resume);
+    }
     if (this.identity.settings?.autoStartPlugins !== false) await this.plugins.autostart();
     this.emit('change');
+  }
+
+  private get resumeFile() {
+    return path.join(this.home, 'resume.json');
+  }
+
+  /** Before an update: remember which plugins are running, then stop everything cleanly. */
+  async prepareForUpdate() {
+    writeJson(this.resumeFile, { at: new Date().toISOString(), plugins: this.plugins.runningIds() });
+    await this.stop();
+  }
+
+  private takeResumeList(): string[] {
+    const r = readJson<{ plugins?: string[] }>(this.resumeFile, {});
+    fs.rmSync(this.resumeFile, { force: true });
+    return r.plugins ?? [];
   }
 
   async stop() {

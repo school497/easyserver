@@ -11,6 +11,12 @@ contextBridge.exposeInMainWorld('easyserverShell', {
   platform: process.platform,
   on: (event: 'menu', cb: (...a: any[]) => void) => (event === 'menu' ? on('shell:menu', cb) : () => {}),
   send: (event: 'servers', data: unknown) => event === 'servers' && ipcRenderer.send('shell:servers', data),
+  updates: {
+    get: () => ipcRenderer.invoke('shell:updates:get'),
+    setMode: (mode: string) => ipcRenderer.invoke('shell:updates:mode', mode),
+    check: () => ipcRenderer.invoke('shell:updates:check'),
+    onStatus: (cb: (s: unknown) => void) => on('shell:updates:status', cb),
+  },
 });
 
 if (process.argv.includes('--easyserver-agent')) {

@@ -1,6 +1,6 @@
-import { showFocusRing } from '../platform';
-import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { showFocusRing, useReducedMotion } from '../platform';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Check, ChevronsUpDown, Compass, House, LayoutGrid, Plus, Search, Settings } from 'lucide-react-native';
 import { isOnline } from '@easyserver/core';
 import { navigate, selectedServer, store, useApp, backend, type Tab } from '../state';
@@ -19,6 +19,20 @@ export function Sidebar({ topInset, translucent }: { topInset: number; transluce
   const { c } = useTheme();
   const route = useApp((s) => s.route);
   const mode = backend().mode;
+  const reduced = useReducedMotion();
+  // The selection highlight slides between rows instead of jumping.
+  const rows = useRef<Record<string, number>>({});
+  const hy = useRef(new Animated.Value(0)).current;
+  const [measured, setMeasured] = useState(0);
+  const placed = useRef(false);
+  useEffect(() => {
+    const y = rows.current[route.tab];
+    if (y == null) return;
+    if (!placed.current || reduced) {
+      hy.setValue(y);
+      placed.current = true;
+    } else Animated.spring(hy, { toValue: y, stiffness: 320, damping: 30, mass: 0.9, useNativeDriver: false }).start();
+  }, [route.tab, measured]);
   return (
     <View
       accessibilityRole={'navigation' as any}
@@ -43,6 +57,10 @@ export function Sidebar({ topInset, translucent }: { topInset: number; transluce
       </View>
       <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: c.sidebarRule, marginHorizontal: 10 }} />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 10, paddingTop: 12 }}>
+        <Animated.View
+          pointerEvents="none"
+          style={{ position: 'absolute', left: 10, right: 10, height: 36, top: hy, borderRadius: 7, backgroundColor: c.sidebarSelected, opacity: measured ? 1 : 0 }}
+        />
         {TABS.map((t, i) => {
           const on = route.tab === t.tab;
           const nextOn = TABS[i + 1]?.tab === route.tab;
@@ -54,9 +72,13 @@ export function Sidebar({ topInset, translucent }: { topInset: number; transluce
               accessibilityState={{ selected: on }}
               accessibilityLabel={t.label}
               onPress={() => navigate(t.tab)}
+              onLayout={(e) => {
+                rows.current[t.tab] = e.nativeEvent.layout.y;
+                if (Object.keys(rows.current).length === TABS.length) setMeasured((n) => n + 1);
+              }}
               style={(st: any) => [
                 styles.item,
-                on ? { backgroundColor: c.sidebarSelected } : st.hovered && { backgroundColor: c.sidebarSelected, opacity: 0.6 },
+                !on && st.hovered && { backgroundColor: c.sidebarSelected, opacity: 0.6 },
                 showFocusRing(st.focused) && ({ outlineColor: c.accent, outlineWidth: 2, outlineStyle: 'solid' } as any),
               ]}
             >

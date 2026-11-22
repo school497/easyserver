@@ -6,7 +6,11 @@ import { fileURLToPath } from 'node:url';
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export function loadEnv() {
-  const out = { ...process.env };
+  // Public project settings (publishable key only, safe to commit); .env and env vars override.
+  const out = {};
+  const pub = path.join(root, 'supabase.public.json');
+  if (fs.existsSync(pub)) Object.assign(out, JSON.parse(fs.readFileSync(pub, 'utf8')));
+  for (const [k, v] of Object.entries(process.env)) if (v) out[k] = v;
   const file = path.join(root, '.env');
   if (fs.existsSync(file)) {
     for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
@@ -22,5 +26,10 @@ export function defines() {
   return {
     __SUPABASE_URL__: JSON.stringify(e.SUPABASE_URL || ''),
     __SUPABASE_KEY__: JSON.stringify(e.SUPABASE_ANON_KEY || ''),
+    __APP_VERSION__: JSON.stringify(appVersion()),
   };
+}
+
+export function appVersion() {
+  return JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 }

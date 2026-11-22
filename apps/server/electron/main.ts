@@ -3,6 +3,7 @@ import path from 'node:path';
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron';
 import { Agent } from '@easyserver/agent';
 import { createMainWindow, singleInstance } from '@easyserver/ui/src/shell/window';
+import { setupUpdates } from '@easyserver/ui/src/shell/updates-ipc';
 
 /**
  * EasyServer Server: the desktop app that turns this computer into a server.
@@ -187,6 +188,8 @@ function createTray() {
 
 if (singleInstance(open)) {
   app.whenReady().then(async () => {
+    // Updates: before installing, remember running plugins and stop them cleanly; they start again afterwards.
+    if (await setupUpdates('server', () => win, () => agent.prepareForUpdate())) return;
     createTray();
     ready = boot();
     if (!process.argv.includes('--hidden')) open();

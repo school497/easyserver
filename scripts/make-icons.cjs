@@ -7,25 +7,40 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 
 function appIcon({ top, bottom, glyph, dot }) {
-  // macOS icon grid: 824pt body inside a 1024 canvas, with a soft drop shadow.
-  const rows = [300, 452, 604]
-    .map(
-      (y, i) => `
-    <rect x="292" y="${y}" width="440" height="120" rx="34" fill="${glyph}" fill-opacity="${0.96 - i * 0.1}"/>
-    <circle cx="352" cy="${y + 60}" r="17" fill="${dot}"/>
-    <rect x="400" y="${y + 50}" width="150" height="20" rx="10" fill="${top}" fill-opacity=".55"/>`,
-    )
+  // macOS icon grid: 824pt body inside a 1024 canvas. Three rack-mounted server units with
+  // brushed fronts, drive bays, a vent grille and glowing status lights, between two rack rails.
+  const unit = (y, i) => `
+    <g filter="url(#u)">
+      <rect x="276" y="${y}" width="472" height="124" rx="26" fill="url(#face)"/>
+      <rect x="276" y="${y}" width="472" height="124" rx="26" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="3"/>
+      <rect x="279" y="${y + 3}" width="466" height="40" rx="22" fill="#fff" opacity=".35"/>
+    </g>
+    <circle cx="330" cy="${y + 62}" r="30" fill="url(#halo)"/>
+    <circle cx="330" cy="${y + 62}" r="13" fill="${dot}"/>
+    <circle cx="326" cy="${y + 58}" r="4" fill="#fff" opacity=".8"/>
+    <circle cx="372" cy="${y + 62}" r="8" fill="${i === 1 ? '#0A84FF' : '#C7CCD4'}"/>
+    ${[0, 1, 2].map((k) => `<rect x="${404 + k * 58}" y="${y + 36}" width="46" height="52" rx="8" fill="url(#bay)"/><rect x="${414 + k * 58}" y="${y + 58}" width="26" height="6" rx="3" fill="#8A93A0"/>`).join('')}
+    ${[0, 1, 2, 3, 4, 5].map((k) => `<rect x="${592 + k * 22}" y="${y + 34}" width="9" height="56" rx="4.5" fill="#7C8592" opacity=".55"/>`).join('')}`;
+  const rails = [232, 768]
+    .map((x) => `<rect x="${x}" y="268" width="24" height="488" rx="10" fill="url(#rail)"/>${[300, 430, 560, 690].map((y) => `<circle cx="${x + 12}" cy="${y}" r="6" fill="#5B6370"/>`).join('')}`)
     .join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient>
-    <linearGradient id="h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="h" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".24"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${glyph}"/><stop offset="1" stop-color="#C9D0DA"/></linearGradient>
+    <linearGradient id="bay" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#AEB6C2"/><stop offset="1" stop-color="#E6EAF0"/></linearGradient>
+    <linearGradient id="rail" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9AA3AF"/><stop offset=".5" stop-color="#E9EDF2"/><stop offset="1" stop-color="#8A93A0"/></linearGradient>
+    <radialGradient id="halo"><stop offset="0" stop-color="${dot}" stop-opacity=".55"/><stop offset="1" stop-color="${dot}" stop-opacity="0"/></radialGradient>
     <filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="12" stdDeviation="14" flood-opacity=".28"/></filter>
+    <filter id="u" x="-10%" y="-30%" width="120%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".3"/></filter>
   </defs>
   <g filter="url(#s)">
     <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#g)"/>
     <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#h)"/>
-  </g>${rows}
+  </g>
+  ${rails}
+  ${[290, 450, 610].map(unit).join('')}
 </svg>`;
 }
 

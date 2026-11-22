@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import readline from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
-import { APP_VERSION, isOnline, type CommandType } from '@easyserver/core';
+import { APP_VERSION, isOnline, UPDATE_MODES, type CommandType } from '@easyserver/core';
+import { cleanupOldBinary, cliUpdateMode, downloadCliUpdate, isCompiledCli, restartIntoUpdate, setCliUpdateMode, updateIntervalMs } from './selfupdate';
 import { Agent } from './agent';
 import { installService, uninstallService } from './service';
 import { errMsg, sleep } from './util';
@@ -21,6 +22,9 @@ Usage: easyserver <command>
   clients                    List paired clients
   revoke <client-id>         Remove a paired client
   reset                      Delete this server from EasyServer and forget it
+  update                     Install the newest version now
+  updates [startup|1h|6h|24h|off]
+                             When the running server checks for updates (default: startup)
   version | help
 `;
 
@@ -55,8 +59,30 @@ async function waitForClient(agent: Agent, first: { code: string; expiresAt: str
   console.log(`\n\n  ${dot(true)} Paired. This server now appears in the client app.\n`);
 }
 
+async function applyUpdate(agent: Agent, running: boolean) {
+  const v = await downloadCliUpdate((m) => console.log(dim(`  ${m}`)));
+  if (!v) return false;
+  if (!running) {
+    console.log(`  ${dot(true)} Updated to ${v}.`);
+    return true;
+  }
+  console.log(`  ${dot(true)} Updated to ${v}. Restarting; running plugins will start again…`);
+  await agent.prepareForUpdate();
+  restartIntoUpdate();
+  return true;
+}
+
 async function runForeground(agent: Agent) {
+  cleanupOldBinary();
   await agent.start();
+  // Automatic updates (easyserver updates <startup|1h|6h|24h|off>).
+  const mode = cliUpdateMode();
+  if (isCompiledCli() && mode !== 'off') {
+    const check = () => applyUpdate(agent, true).catch((e) => console.error(dim(`  Update check failed: ${errMsg(e)}`)));
+    setTimeout(check, 5000);
+    const every = updateIntervalMs(mode);
+    if (every) setInterval(check, every);
+  }
   console.log(dim('  Press Ctrl+C to stop.\n'));
   let stopping = false;
   const shutdown = async () => {
@@ -180,6 +206,18 @@ async function main() {
       console.log('Server removed. Installed plugins are still on disk.');
       return;
     }
+    case 'update': {
+      if (!(await applyUpdate(agent, false))) console.log(`EasyServer ${APP_VERSION} is up to date.`);
+      return;
+    }
+    case 'updates': {
+      const modes = UPDATE_MODES.map((m) => m.value as string);
+      if (!args[0]) return console.log(`Automatic updates: ${cliUpdateMode()}  (choose: ${modes.join(', ')})`);
+      if (!modes.includes(args[0])) throw new Error(`Choose one of: ${modes.join(', ')}`);
+      setCliUpdateMode(args[0] as any);
+      console.log(`Automatic updates set to ${args[0]}. Takes effect the next time the server starts.`);
+      return;
+    }
     case 'version':
     case '--version':
     case '-v':
@@ -192,7 +230,7 @@ async function main() {
 
 main().then(
   () => {
-    if (!['start', '__run-script'].includes(process.argv[2] ?? '')) process.exit(0);
+    if (!['start', '__run-script', 'update'].includes(process.argv[2] ?? '')) process.exit(0);
   },
   (e) => {
     console.error(`\x1b[31merror\x1b[0m ${errMsg(e)}`);

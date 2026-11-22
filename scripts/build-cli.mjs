@@ -3,9 +3,8 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { loadEnv, root } from './env.mjs';
+import { defines, root } from './env.mjs';
 
-const env = loadEnv();
 const targets = [
   ['bun-darwin-arm64', 'easyserver-macos-arm64'],
   ['bun-darwin-x64', 'easyserver-macos-x64'],
@@ -26,8 +25,7 @@ for (const [target, name] of targets) {
     [
       'build', path.join(root, 'packages/agent/src/cli.ts'),
       '--compile', `--target=${target}`, '--minify',
-      `--define`, `__SUPABASE_URL__=${JSON.stringify(env.SUPABASE_URL || '')}`,
-      `--define`, `__SUPABASE_KEY__=${JSON.stringify(env.SUPABASE_ANON_KEY || '')}`,
+      ...Object.entries(defines()).flatMap(([k, v]) => ['--define', `${k}=${v}`]),
       '--outfile', path.join(out, name),
     ],
     { stdio: 'inherit', cwd: root },

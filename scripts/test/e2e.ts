@@ -127,6 +127,20 @@ async function main() {
   await waitFor(async () => state.plugins[0]?.status === 'stopped');
   ok('remote stop');
 
+  // Update restart: autostart off, plugin running → after prepareForUpdate + fresh agent, it runs again.
+  await client.send('server.settings', { settings: { autoStartPlugins: false } });
+  await client.send('plugin.start', { pluginId: id }, { timeoutMs: 30_000 });
+  await waitFor(async () => state.plugins[0]?.status === 'running');
+  await agent.prepareForUpdate();
+  assert.ok(fs.existsSync(path.join(home, 'resume.json')));
+  const updated = new Agent(() => {});
+  await updated.start();
+  await waitFor(async () => updated.plugins.get(id).status === 'running', 30_000);
+  assert.equal(fs.existsSync(path.join(home, 'resume.json')), false);
+  ok('after an update restart, plugins that were running start again (even with autostart off)');
+  await updated.plugins.stopAll();
+  await updated.stop();
+
   await client.leave(sid);
   assert.equal(state.servers.length, 0);
   ok('client removes the server from its list');

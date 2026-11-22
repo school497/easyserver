@@ -4,3 +4,4 @@ export * from './github';
 export * from './crypto';
 export * from './types';
 export * from './trending';
+export * from './updates';

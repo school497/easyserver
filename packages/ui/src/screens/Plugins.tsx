@@ -7,6 +7,8 @@ import { PluginIcon } from '../components/PluginIcon';
 import { navigate, selectedServer, store, useApp } from '../state';
 import { useTheme } from '../theme';
 import { iconFor } from './Home';
+import { isOfficial } from '../catalog';
+import { Verified } from '../components/Verified';
 
 export function PluginsScreen() {
   const { c } = useTheme();
@@ -44,9 +46,11 @@ export function PluginsScreen() {
                   {({ hovered }: any) => (
                     <Card style={[{ alignItems: 'center', paddingVertical: 22 }, hovered && ({ boxShadow: `0 6px 20px ${c.shadow}` } as any)]}>
                       <PluginIcon id={p.plugin_id} name={p.name} uri={iconFor(p)} size={72} />
-                      <T v="headline" numberOfLines={1} style={{ marginTop: 12, marginBottom: 4, textAlign: 'center' }}>
-                        {p.name}
-                      </T>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12, marginBottom: 4, maxWidth: '100%' }}>
+                        <T v="headline" numberOfLines={1} style={{ textAlign: 'center', flexShrink: 1 }}>
+                          {p.name}
+                        </T>
+                      </View>
                       <StatusLabel status={st.tone} label={st.label} />
                     </Card>
                   )}

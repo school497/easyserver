@@ -11,6 +11,8 @@ import { backend, navigate, run, selectedServer, toast, useApp } from '../state'
 import { formatBytes, openUrl, pickFiles, timeAgo } from '../platform';
 import { useTheme } from '../theme';
 import { iconFor } from './Home';
+import { isOfficial } from '../catalog';
+import { Verified } from '../components/Verified';
 
 export function PluginDetailScreen({ pluginId }: { pluginId: string }) {
   const p = useApp((s) => s.plugins.find((x) => x.plugin_id === pluginId));
@@ -39,9 +41,11 @@ export function PluginDetailScreen({ pluginId }: { pluginId: string }) {
           <T v="title1" accessibilityRole="header">
             {p.name}
           </T>
-          <T color="secondary" style={{ marginTop: 2, marginBottom: 8 }}>
-            {p.manifest.developer} · Version {p.version}
-          </T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2, marginBottom: 8, flexWrap: 'wrap' }}>
+            <T color="secondary">{p.manifest.developer}</T>
+            {isOfficial(p.source_url, p.manifest.developer) ? <Verified size={15} /> : null}
+            <T color="secondary">· Version {p.version}</T>
+          </View>
           <StatusLabel v="body" status={st.tone} label={busy ? `${busy}…` : st.label} />
           {p.status_detail ? (
             <T v="callout" color={p.status === 'error' ? 'redText' : 'secondary'} selectable style={{ marginTop: 4, maxWidth: 560 }}>

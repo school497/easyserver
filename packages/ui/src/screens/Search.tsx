@@ -33,14 +33,18 @@ export function SearchScreen() {
   const results = useMemo(() => search(index, q), [index, q]);
   const typing = q.trim().length > 0;
 
+  const [focused, setFocused] = useState(false);
+  const focus = useRef(new Animated.Value(0)).current;
+  // The bar glides with a soft spring; Reduce Motion gets a short, direct move instead.
   useEffect(() => {
-    Animated.timing(p, {
-      toValue: typing ? 1 : 0,
-      duration: reduced ? 0 : 420,
-      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
-      useNativeDriver: false,
-    }).start();
+    (reduced
+      ? Animated.timing(p, { toValue: typing ? 1 : 0, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: false })
+      : Animated.spring(p, { toValue: typing ? 1 : 0, stiffness: 170, damping: 24, mass: 1, useNativeDriver: false })
+    ).start();
   }, [typing, reduced]);
+  useEffect(() => {
+    Animated.timing(focus, { toValue: focused ? 1 : 0, duration: reduced ? 0 : 220, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+  }, [focused, reduced]);
   useEffect(() => setActive(0), [q]);
   useEffect(() => {
     const t = setTimeout(() => inputRef.current?.focus(), 50);
@@ -50,7 +54,9 @@ export function SearchScreen() {
   const centerY = Math.max(TOP, h / 2 - BAR_H / 2 - 40);
   const translateY = p.interpolate({ inputRange: [0, 1], outputRange: [centerY, TOP] });
   const cardOpacity = p.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0, 1] });
-  const cardShift = p.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
+  const cardShift = p.interpolate({ inputRange: [0, 1], outputRange: [reduced ? 0 : 28, 0] });
+  const cardScale = p.interpolate({ inputRange: [0, 1], outputRange: [reduced ? 1 : 0.97, 1] });
+  const barScale = focus.interpolate({ inputRange: [0, 1], outputRange: [1, reduced ? 1 : 1.015] });
   const hintOpacity = p.interpolate({ inputRange: [0, 0.3], outputRange: [1, 0], extrapolate: 'clamp' });
 
   const go = (r: SearchResult) => {
@@ -73,9 +79,10 @@ export function SearchScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: c.window }} onLayout={(e: LayoutChangeEvent) => setH(e.nativeEvent.layout.height)}>
-      <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: 0, transform: [{ translateY }], alignItems: 'center', paddingHorizontal: 32, zIndex: 2 }}>
-        <View
+      <Animated.View style={{ position: 'absolute', left: 0, right: 0, top: 0, opacity: h ? 1 : 0, transform: [{ translateY }], alignItems: 'center', paddingHorizontal: 32, zIndex: 2 }}>
+        <Animated.View
           style={{
+            transform: [{ scale: barScale }],
             width: '100%',
             maxWidth: 620,
             height: BAR_H,
@@ -85,24 +92,29 @@ export function SearchScreen() {
             paddingHorizontal: 14,
             backgroundColor: dark ? '#2C2C2E' : '#FFFFFF',
             borderWidth: 1,
-            borderColor: c.separator,
-            boxShadow: `0 8px 28px ${c.shadow}`,
+            borderColor: focused ? c.accent : c.separator,
+            boxShadow: focused ? `0 0 0 4px ${c.highlight}, 0 14px 36px ${c.shadow}` : `0 8px 28px ${c.shadow}`,
+            transitionProperty: 'box-shadow, border-color',
+            transitionDuration: '220ms',
+            transitionTimingFunction: 'ease-out',
           } as any}
         >
-          <SearchIcon size={18} color={c.secondary} />
+          <SearchIcon size={18} color={focused ? c.accent : c.secondary} />
           <TextInput
             ref={inputRef}
             value={q}
             onChangeText={setQ}
             onKeyPress={onKey}
             onSubmitEditing={() => results[active] && go(results[active])}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder="Search"
             placeholderTextColor={c.secondary}
             accessibilityLabel="Search everything in EasyServer"
             style={[type.body, { flex: 1, fontSize: 16, marginLeft: 10, color: c.label, height: BAR_H - 2, outlineStyle: 'none' } as any]}
           />
           {typing ? <IconButton icon={X} label="Clear search" size={24} onPress={() => (setQ(''), inputRef.current?.focus())} /> : null}
-        </View>
+        </Animated.View>
         <Animated.View style={{ opacity: hintOpacity, marginTop: 14 }} pointerEvents="none">
           <T v="callout" color="secondary" style={{ textAlign: 'center' }}>
             Search plugins, settings and logs.
@@ -121,7 +133,7 @@ export function SearchScreen() {
           alignItems: 'center',
           paddingHorizontal: 32,
           opacity: cardOpacity,
-          transform: [{ translateY: cardShift }],
+          transform: [{ translateY: cardShift }, { scale: cardScale }],
         }}
       >
         <View
@@ -156,7 +168,7 @@ export function SearchScreen() {
                   {items.map((r) => {
                     flatIndex++;
                     const i = flatIndex;
-                    return <ResultRow key={r.key} r={r} active={i === active} onHover={() => setActive(i)} onPress={() => go(r)} />;
+                    return <ResultRow key={r.key} r={r} index={i} reduced={reduced} active={i === active} onHover={() => setActive(i)} onPress={() => go(r)} />;
                   })}
                 </View>
               ))}
@@ -168,18 +180,24 @@ export function SearchScreen() {
   );
 }
 
-function ResultRow({ r, active, onPress, onHover }: { r: SearchResult; active: boolean; onPress: () => void; onHover: () => void }) {
+function ResultRow({ r, active, onPress, onHover, index, reduced }: { r: SearchResult; active: boolean; onPress: () => void; onHover: () => void; index: number; reduced: boolean }) {
+  // New results fade up into place, slightly staggered.
+  const appear = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(appear, { toValue: 1, duration: reduced ? 120 : 220, delay: reduced ? 0 : Math.min(index, 10) * 18, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+  }, []);
   const { c } = useTheme();
   const tabIcon = TABS.find((t) => t.tab === r.tab)!.icon;
   const Icon = tabIcon;
   return (
+    <Animated.View style={{ opacity: appear, transform: [{ translateY: appear.interpolate({ inputRange: [0, 1], outputRange: [reduced ? 0 : 6, 0] }) }] }}>
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={`${r.title}, ${r.subtitle}`}
       onPress={onPress}
       onHoverIn={onHover}
       style={(st: any) => [
-        { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8 },
+        { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, transitionProperty: 'background-color', transitionDuration: '120ms' } as any,
         active && { backgroundColor: c.accent },
         showFocusRing(st.focused) && ({ outlineColor: c.accent, outlineWidth: 2, outlineStyle: 'solid' } as any),
       ]}
@@ -201,5 +219,6 @@ function ResultRow({ r, active, onPress, onHover }: { r: SearchResult; active: b
       </View>
       <ChevronRight size={14} color={active ? '#fff' : c.tertiary} />
     </Pressable>
+    </Animated.View>
   );
 }

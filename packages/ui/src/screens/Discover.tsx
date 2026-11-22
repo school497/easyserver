@@ -1,43 +1,44 @@
 import { showFocusRing } from '../platform';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ChevronLeft, ChevronRight, Search as SearchIcon, X } from 'lucide-react-native';
 import { CATEGORIES } from '@easyserver/core';
 import { Page, Target } from '../components/Page';
 import { Button, Empty, IconButton, SectionHeader, Spinner, T } from '../components/primitives';
 import { PluginIcon } from '../components/PluginIcon';
-import { trending, useLiveCatalog, type CatalogItem } from '../catalog';
+import { InstallButton, installProgress } from '../components/InstallButton';
+import { isOfficial, trending, useLiveCatalog, type CatalogItem } from '../catalog';
+import { Verified } from '../components/Verified';
 import { backend, navigate, run, selectedServer, store, useApp } from '../state';
 import { useTheme, type } from '../theme';
 import { isOnline } from '@easyserver/core';
 
-/** GET / OPEN / progress, shared by cards and the detail page. */
+/** Install / progress / Open, shared by cards and the detail page. */
 export function GetButton({ item, large }: { item: CatalogItem; large?: boolean }) {
-  const installed = useApp((s) => s.plugins.find((p) => p.plugin_id === item.id));
+  const row = useApp((s) => s.plugins.find((p) => p.plugin_id === item.id));
   const busy = useApp((s) => s.busy[item.sourceUrl]);
   const server = useApp(selectedServer);
   const mode = backend().mode;
   const canInstall = !!server && (mode === 'server' || isOnline(server));
-  if (installed) {
-    return (
-      <Button
-        kind="get"
-        title="Open"
-        accessibilityLabel={`Open ${item.name}`}
-        onPress={() => navigate('plugins', { kind: 'plugin', pluginId: item.id })}
-        style={large && { minWidth: 88 }}
-      />
-    );
-  }
+  const installing = !!busy || row?.status === 'installing';
+  const phase = installing ? 'installing' : row ? 'installed' : 'idle';
+  const started = useRef(Date.now());
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!installing) return;
+    started.current = Date.now();
+    const id = setInterval(() => tick((n) => n + 1), 250);
+    return () => clearInterval(id);
+  }, [installing]);
   return (
-    <Button
-      kind="get"
-      title={busy ? undefined : 'Get'}
-      loading={!!busy}
-      accessibilityLabel={busy ? `Installing ${item.name}` : `Get ${item.name}`}
+    <InstallButton
+      phase={phase}
+      progress={phase === 'installed' ? 1 : installProgress(row?.status_detail, started.current)}
+      onInstall={() => install(item)}
+      onOpen={() => navigate('plugins', { kind: 'plugin', pluginId: item.id })}
       disabled={!canInstall}
-      onPress={() => install(item)}
-      style={large && { minWidth: 88 }}
+      large={large}
+      name={item.name}
     />
   );
 }
@@ -45,7 +46,7 @@ export function GetButton({ item, large }: { item: CatalogItem; large?: boolean 
 export async function install(item: CatalogItem) {
   const server = selectedServer(store.get());
   if (!server) return store.set({ addServerOpen: true });
-  await run(item.sourceUrl, 'Installing', () => backend().send('plugin.install', { sourceUrl: item.sourceUrl }, { timeoutMs: 10 * 60_000 }));
+  return run(item.sourceUrl, 'Installing', () => backend().send('plugin.install', { sourceUrl: item.sourceUrl }, { timeoutMs: 10 * 60_000 }));
 }
 
 function Card({ item }: { item: CatalogItem }) {
@@ -64,9 +65,11 @@ function Card({ item }: { item: CatalogItem }) {
       >
         <PluginIcon uri={item.iconUrl} name={item.name} id={item.id} size={64} />
         <View style={{ flex: 1, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.separator, paddingBottom: 10, alignSelf: 'stretch', justifyContent: 'center' }}>
-          <T v="headline" numberOfLines={1}>
-            {item.name}
-          </T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <T v="headline" numberOfLines={1} style={{ flexShrink: 1 }}>
+              {item.name}
+            </T>
+          </View>
           <T v="callout" color="secondary" numberOfLines={2} style={{ marginBottom: 6 }}>
             {item.manifest.subtitle ?? CATEGORIES[item.manifest.category]}
           </T>

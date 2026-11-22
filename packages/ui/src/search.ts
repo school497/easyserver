@@ -34,12 +34,11 @@ const dashboard: [string, string, string][] = [
 ];
 
 const clientSettings: [string, string, string][] = [
-  ['settings.account', 'Account', 'email sign in sign out guest'],
-  ['settings.2fa', 'Two-Factor Authentication', '2fa mfa totp authenticator security code'],
   ['settings.server', 'Server Name', 'rename current server'],
   ['settings.autostart', 'Start Plugins Automatically', 'boot launch autostart'],
   ['settings.encryption', 'Encryption Key', 'fingerprint security end-to-end'],
   ['settings.remove', 'Remove Server from This Device', 'unpair forget leave delete'],
+  ['settings.updates', 'Updates', 'update upgrade version automatic check'],
   ['settings.store', 'Plugin Store Cache', 'clear cache refresh'],
   ['settings.about', 'About EasyServer', 'version'],
 ];
@@ -52,6 +51,7 @@ const serverSettings: [string, string, string][] = [
   ['settings.encryption', 'Encryption Key', 'fingerprint security end-to-end'],
   ['settings.data', 'Data Folder', 'files location disk'],
   ['settings.cli', 'Command-Line Tool', 'terminal cli headless service'],
+  ['settings.updates', 'Updates', 'update upgrade version automatic check'],
   ['settings.store', 'Plugin Store Cache', 'clear cache refresh'],
   ['settings.reset', 'Reset Server', 'delete remove forget'],
   ['settings.about', 'About EasyServer', 'version'],

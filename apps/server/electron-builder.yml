@@ -3,6 +3,7 @@ productName: EasyServer Server
 electronVersion: 33.2.1
 npmRebuild: false
 asar: true
+publish: null
 directories:
   output: ../../release/server
   buildResources: build
@@ -14,19 +15,23 @@ files:
 mac:
   category: public.app-category.developer-tools
   icon: build/icon.png
+  # Ad-hoc signed (required on Apple silicon). Not notarized: first open with right-click > Open.
+  identity: "-"
   target:
     - target: dmg
       arch: [arm64, x64]
-  # Ad-hoc signed (required on Apple silicon). Not notarized: first open with right-click > Open. Set a Developer ID here to notarize.
-  identity: "-"
+    # The zip is what the built-in updater installs from.
+    - target: zip
+      arch: [arm64, x64]
+  artifactName: EasyServer-Server-${version}-mac-${arch}.${ext}
 dmg:
-  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  artifactName: EasyServer-Server-${version}-mac-${arch}.${ext}
 win:
   icon: build/icon.png
   target:
     - target: nsis
       arch: [x64]
-  artifactName: ${productName}-Setup-${version}-win-${arch}.${ext}
+  artifactName: EasyServer-Server-Setup-${version}-win-${arch}.${ext}
 nsis:
   oneClick: false
   perMachine: false
@@ -39,5 +44,5 @@ linux:
       arch: [x64]
     - target: deb
       arch: [x64]
-  artifactName: ${productName}-${version}-linux-${arch}.${ext}
+  artifactName: EasyServer-Server-${version}-linux-${arch}.${ext}
   maintainer: EasyServer

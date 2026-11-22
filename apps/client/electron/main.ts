@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import { createMainWindow, singleInstance } from '@easyserver/ui/src/shell/window';
+import { setupUpdates } from '@easyserver/ui/src/shell/updates-ipc';
 
 app.setName('EasyServer');
 let win: BrowserWindow | null = null;
@@ -15,7 +16,11 @@ const open = () => {
 };
 
 if (singleInstance(open)) {
-  app.whenReady().then(open);
+  app.whenReady().then(async () => {
+    // A deferred update installs before the window appears.
+    if (await setupUpdates('client', () => win)) return;
+    open();
+  });
   app.on('activate', open);
   app.on('window-all-closed', () => process.platform !== 'darwin' && app.quit());
 }

@@ -130,7 +130,8 @@ export class PluginManager {
       fs.rmSync(staging, { recursive: true, force: true });
       ensureDir(staging);
       let total = 0;
-      for (const file of m.files) {
+      for (const [i, file] of m.files.entries()) {
+        this.setStatus(m.id, 'installing', `Downloading files ${i + 1}/${m.files.length}`);
         const r = await fetch(rawUrl(loc, file), { cache: 'no-store' });
         if (!r.ok) throw new Error(`Couldn't download ${file} (HTTP ${r.status}).`);
         const buf = Buffer.from(await r.arrayBuffer());
@@ -406,6 +407,18 @@ export class PluginManager {
 
   async stopAll() {
     await Promise.all([...this.procs.keys()].map((id) => this.stop(id, false).catch(() => {})));
+  }
+
+  /** Ids of plugins whose process is running right now. */
+  runningIds() {
+    return [...this.procs.keys()];
+  }
+
+  /** Starts specific plugins (used to resume after an update). */
+  async resume(ids: string[]) {
+    for (const id of ids) {
+      if (this.records[id] && !this.procs.has(id)) this.start(id, false).catch((e) => this.host.log('error', `[${id}] ${errMsg(e)}`));
+    }
   }
 
   async autostart() {

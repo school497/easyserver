@@ -4,7 +4,8 @@ import { CATEGORIES, isOnline } from '@easyserver/core';
 import { Page } from '../components/Page';
 import { Button, Card, Empty, Row, SectionHeader, T } from '../components/primitives';
 import { PluginIcon } from '../components/PluginIcon';
-import { useCatalog } from '../catalog';
+import { isOfficial, useCatalog } from '../catalog';
+import { Verified } from '../components/Verified';
 import { backend, navigate, selectedServer, useApp } from '../state';
 import { openUrl, platformName } from '../platform';
 import { GetButton } from './Discover';
@@ -25,6 +26,7 @@ export function StoreDetailScreen({ sourceUrl }: { sourceUrl: string }) {
     );
   }
   const m = item.manifest;
+  const official = isOfficial(item.sourceUrl, m.developer);
   const supported = server?.platform ? m.platforms.includes(server.platform as any) : true;
   const hint = !server
     ? 'Add a server to install plugins.'
@@ -42,9 +44,12 @@ export function StoreDetailScreen({ sourceUrl }: { sourceUrl: string }) {
           <T v="title1" accessibilityRole="header">
             {m.name}
           </T>
-          <T v="body" color="secondary" style={{ marginTop: 2 }}>
-            {m.developer}
-          </T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
+            <T v="body" color="secondary">
+              {m.developer}
+            </T>
+            {official ? <Verified size={15} /> : null}
+          </View>
           {m.subtitle ? (
             <T v="callout" color="secondary" style={{ marginTop: 8 }}>
               {m.subtitle}
@@ -71,14 +76,19 @@ export function StoreDetailScreen({ sourceUrl }: { sourceUrl: string }) {
 
       <SectionHeader title="Information" />
       <Card style={{ paddingVertical: 4 }}>
-        <Row label="Developer" value={m.developer} />
+        <Row
+          label="Developer"
+          value={
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <T color="secondary">{m.developer}</T>
+              {official ? <Verified size={15} /> : null}
+            </View>
+          }
+        />
         <Row label="Category" value={CATEGORIES[m.category]} />
         <Row label="Version" value={m.version} />
         <Row label="Works On" value={m.platforms.map(platformName).join(', ')} />
-        <Row label="Settings" value={m.settings?.length ? `${m.settings.length} options` : 'None'} />
-        <Row label="Source" last>
-          <Button kind="plain" small title="View on GitHub" onPress={() => openUrl(item.sourceUrl)} />
-        </Row>
+        <Row label="Settings" value={m.settings?.length ? `${m.settings.length} options` : 'None'} last />
       </Card>
     </Page>
   );

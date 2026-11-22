@@ -2,7 +2,9 @@
 Run from the repo root: python scripts/make-plugins.py
 Each plugins/<slug>/ folder is self-contained: push it to GitHub and list its URL in plugin_sources.
 """
-import json, os, shutil
+import json, os, shutil, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from plugin_icons import ICONS
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'plugins')
 WINGET = '{{env.LOCALAPPDATA}}/Microsoft/WinGet/Links'
@@ -781,7 +783,7 @@ def main():
         os.makedirs(os.path.join(d, 'scripts'), exist_ok=True)
         files = ['icon.svg']
         with open(os.path.join(d, 'icon.svg'), 'w', encoding='utf8') as f:
-            f.write(p['icon'])
+            f.write(ICONS.get(p['slug'], p['icon']))
         needs_lib = bool(p['scripts'])
         for s in p['scripts']:
             if isinstance(s, tuple):

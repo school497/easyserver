@@ -91,6 +91,29 @@ easyserver service install
 **On your computer**: open EasyServer, click the pill at the bottom of the sidebar › **Add Server…**,
 type the code. The server appears and is selected.
 
+## Updates
+
+Both apps and the CLI update themselves from this repository's GitHub Releases (`latest.json`
+lists every build with its SHA-512). In the apps, choose when to check in Settings › Updates:
+when the app opens, every hour, every 6 hours, every day, or never. On the CLI:
+
+```bash
+easyserver updates 6h
+```
+
+```bash
+easyserver update
+```
+
+Before an update installs on a server, EasyServer records which plugins are running and starts
+exactly those again afterwards, even if Start Plugins Automatically is off.
+
+To publish a release, push a version tag; the Release workflow builds everything and publishes it:
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0
+```
+
 ## Develop
 
 ```bash

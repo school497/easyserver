@@ -33,9 +33,14 @@ export function pickFiles(opts: { directory?: boolean; accept?: string[] } = {})
 
 export const openUrl = (url: string) => Linking.openURL(url);
 
+// `?motion=full` in the URL ignores the system setting (for testing animations).
+const forceMotion = typeof location !== 'undefined' && new URLSearchParams(location.search).get('motion') === 'full';
+
+/** Reduce Motion: keep fades, colour and progress; drop zooms, slides, blur and bounce. */
 export function useReducedMotion() {
   const [on, setOn] = useState(false);
   useEffect(() => {
+    if (forceMotion) return;
     AccessibilityInfo.isReduceMotionEnabled?.().then(setOn).catch(() => {});
     const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', setOn);
     return () => sub?.remove?.();

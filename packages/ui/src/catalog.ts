@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { manifestUrl, parseGithubUrl, rawUrl, rankTrending, validateManifest, type InstallStat, type PluginManifest } from '@easyserver/core';
+import { OFFICIAL_PLUGIN_SOURCES, manifestUrl, parseGithubUrl, rawUrl, rankTrending, validateManifest, type InstallStat, type PluginManifest } from '@easyserver/core';
 import { backend } from './state';
 
 /**
@@ -135,6 +135,13 @@ export function useLiveCatalog() {
     if (!sourcesSub) sourcesSub = backend().onSourcesChanged(() => refreshCatalog(true));
   }, []);
   return s;
+}
+
+/** Published by EasyServer: listed from its own plugin repository (or the demo catalog). */
+export function isOfficial(sourceUrl: string | null | undefined, developer?: string) {
+  if (!sourceUrl) return false;
+  if (OFFICIAL_PLUGIN_SOURCES.some((p) => sourceUrl.startsWith(p))) return true;
+  return !!backend().demo && developer === 'EasyServer';
 }
 
 export const trending = (items: CatalogItem[], stats: InstallStat[]) => rankTrending(items, stats, 10);

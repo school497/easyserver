@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Image, View } from 'react-native';
-import { APP_VERSION, fingerprint, isOnline } from '@easyserver/core';
+import { APP_VERSION, UPDATE_MODES, fingerprint, isOnline, type UpdateMode, type UpdateStatus } from '@easyserver/core';
 import { Page, Target } from '../components/Page';
-import { Button, Card, Field, Row, SectionHeader, Spinner, T, Toggle } from '../components/primitives';
+import { Button, Card, Field, Row, SectionHeader, Segmented, Separator, Spinner, T, Toggle } from '../components/primitives';
 import { Confirm, Sheet, SheetButtons } from '../components/Modal';
 import { CodeDisplay } from '../components/CodeInput';
 import { backend, run, selectedServer, store, toast, useApp } from '../state';
@@ -29,6 +29,7 @@ export function SettingsScreen() {
   return (
     <Page title="Settings" maxWidth={760}>
       {mode === 'client' ? <ClientSettings /> : <ServerSettings />}
+      <UpdatesSection />
       <StoreSection />
       <Section id="settings.about" title="About">
         <Row label="EasyServer" value={`Version ${APP_VERSION}${backend().demo ? ' (demo data)' : ''}`} last />
@@ -93,6 +94,65 @@ function KeyRow() {
   );
 }
 
+/** Settings › Updates (desktop apps only). */
+function UpdatesSection() {
+  const shell = (globalThis as any).easyserverShell?.updates;
+  const [info, setInfo] = useState<{ mode: UpdateMode; status: UpdateStatus; version: string } | null>(null);
+  useEffect(() => {
+    if (!shell) return;
+    shell.get().then(setInfo);
+    return shell.onStatus((status: UpdateStatus) => setInfo((i) => (i ? { ...i, status } : i)));
+  }, []);
+  if (!shell) return null;
+  if (!info) return null;
+  const st = info.status;
+  const text =
+    st.state === 'checking'
+      ? 'Checking…'
+      : st.state === 'downloading'
+        ? `Downloading ${st.version} · ${Math.round((st.progress ?? 0) * 100)}%`
+        : st.state === 'ready'
+          ? `Version ${st.version} is ready`
+          : st.state === 'installing'
+            ? `Installing ${st.version}…`
+            : st.state === 'up-to-date'
+              ? `Up to date${st.lastChecked ? ` · checked ${timeAgo(st.lastChecked)}` : ''}`
+              : st.state === 'error' || st.state === 'unsupported'
+                ? st.error ?? 'Couldn’t check for updates.'
+                : 'Not checked yet';
+  const busy = st.state === 'checking' || st.state === 'downloading' || st.state === 'installing';
+  return (
+    <Section
+      id="settings.updates"
+      title="Updates"
+      footer={
+        backend().mode === 'server'
+          ? 'Updates install automatically. Plugins that were running start again right after.'
+          : 'Updates download in the background and install when EasyServer restarts.'
+      }
+    >
+      <View style={{ paddingVertical: 8 }}>
+        <T v="headline" style={{ marginBottom: 8 }}>
+          Check for Updates
+        </T>
+        <Segmented
+          label="Check for updates"
+          value={info.mode}
+          options={UPDATE_MODES.map((m) => ({ label: m.label, value: m.value }))}
+          onChange={(mode) => shell.setMode(mode).then((m: UpdateMode) => setInfo((i) => (i ? { ...i, mode: m } : i)))}
+        />
+      </View>
+      <Separator />
+      <Row label={`EasyServer ${info.version}`} last>
+        <T color={st.state === 'error' ? 'redText' : 'secondary'} numberOfLines={2} style={{ flexShrink: 1, textAlign: 'right' }}>
+          {text}
+        </T>
+        <Button title="Check Now" onPress={() => shell.check()} loading={busy} />
+      </Row>
+    </Section>
+  );
+}
+
 function StoreSection() {
   const cat = useCatalog();
   return (
@@ -112,8 +172,6 @@ function ClientSettings() {
   const online = isOnline(server);
   return (
     <>
-      <AccountSection />
-      <TwoFactorSection />
       {server ? (
         <Section id="settings.serverSection" title="Current Server" footer="If this key matches the one in the server’s Settings, only that server can read files you upload.">
           <ServerNameRow />
@@ -144,185 +202,6 @@ function ClientSettings() {
         </Target>
       ) : null}
     </>
-  );
-}
-
-function AccountSection() {
-  const account = useApp((s) => s.account);
-  const [form, setForm] = useState<null | 'save' | 'signin'>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [mfaCode, setMfaCode] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [confirmOut, setConfirmOut] = useState(false);
-  const b = backend();
-  const close = () => (setForm(null), setErr(null), setPassword(''), setMfaCode(null));
-
-  const submit = async () => {
-    setErr(null);
-    setBusy(true);
-    try {
-      if (mfaCode != null) {
-        await b.verifySignInMfa!(mfaCode);
-        close();
-      } else if (form === 'save') {
-        toast(await b.signUpWithEmail!(email.trim(), password));
-        close();
-      } else {
-        const r = await b.signIn!(email.trim(), password);
-        if (r === 'mfa') setMfaCode('');
-        else close();
-      }
-    } catch (e: any) {
-      setErr(e?.message ?? String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Section
-      id="settings.account"
-      title="Account"
-      footer={account?.isAnonymous ? 'This device uses a guest account. Add an email to sign in on other devices and to turn on two-factor authentication.' : undefined}
-    >
-      <Row label="Signed In As" value={account ? (account.isAnonymous ? 'Guest' : account.email ?? 'Account') : '—'} />
-      <Row label={account?.isAnonymous ? 'Email' : 'This Device'} last>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {account?.isAnonymous ? <Button kind="primary" title="Add Email…" onPress={() => setForm('save')} /> : null}
-          {account?.isAnonymous ? <Button title="Sign In…" onPress={() => setForm('signin')} /> : <Button title="Sign Out…" onPress={() => setConfirmOut(true)} />}
-        </View>
-      </Row>
-      {form ? (
-        <Sheet
-          title={mfaCode != null ? 'Enter Your Verification Code' : form === 'save' ? 'Add an Email Address' : 'Sign In'}
-          message={
-            mfaCode != null
-              ? 'Open your authenticator app and enter the six-digit code for EasyServer.'
-              : form === 'save'
-                ? 'You’ll get a message to confirm it. Your servers stay with this account.'
-                : 'Signing in replaces the guest account on this device. Servers paired to the guest account will no longer appear.'
-          }
-          onClose={close}
-        >
-          {mfaCode != null ? (
-            <Field label="Code" value={mfaCode} onChangeText={(t) => setMfaCode(t.replace(/\D/g, '').slice(0, 6))} autoFocus autoComplete="one-time-code" inputMode="numeric" onSubmitEditing={submit} error={err} />
-          ) : (
-            <>
-              <Field label="Email" value={email} onChangeText={setEmail} autoFocus autoComplete="email" inputMode="email" autoCapitalize="none" />
-              <Field
-                label="Password"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoComplete={form === 'save' ? 'new-password' : 'current-password'}
-                hint={form === 'save' ? 'At least 8 characters.' : undefined}
-                onSubmitEditing={submit}
-                error={err}
-              />
-            </>
-          )}
-          <SheetButtons>
-            <Button title="Cancel" onPress={close} />
-            <Button
-              kind="primary"
-              title={mfaCode != null ? 'Verify' : form === 'save' ? 'Add Email' : 'Sign In'}
-              onPress={submit}
-              loading={busy}
-              disabled={mfaCode != null ? mfaCode.length !== 6 : !email.includes('@') || password.length < (form === 'save' ? 8 : 1)}
-            />
-          </SheetButtons>
-        </Sheet>
-      ) : null}
-      {confirmOut ? (
-        <Confirm
-          title="Sign Out?"
-          message="Your servers disappear from this device until you sign in again. They keep running."
-          confirmLabel="Sign Out"
-          onCancel={() => setConfirmOut(false)}
-          onConfirm={() => {
-            setConfirmOut(false);
-            run('signout', 'Signing out', () => b.signOut!());
-          }}
-        />
-      ) : null}
-    </Section>
-  );
-}
-
-function TwoFactorSection() {
-  const account = useApp((s) => s.account);
-  const [enroll, setEnroll] = useState<{ factorId: string; qr: string; secret: string } | null>(null);
-  const [code, setCode] = useState('');
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [confirmOff, setConfirmOff] = useState(false);
-  const b = backend();
-  const enabled = !!account?.mfa?.verified;
-
-  const start = async () => {
-    setBusy(true);
-    try {
-      setEnroll(await b.enrollMfa!());
-    } catch (e: any) {
-      toast(e?.message ?? String(e), 'error');
-    } finally {
-      setBusy(false);
-    }
-  };
-  const verify = async () => {
-    setBusy(true);
-    setErr(null);
-    try {
-      await b.verifyMfa!(enroll!.factorId, code);
-      setEnroll(null);
-      setCode('');
-      toast('Two-factor authentication is on.');
-    } catch (e: any) {
-      setErr(e?.message ?? String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Section id="settings.2fa" title="Two-Factor Authentication" footer="With this on, you’ll need a code from your authenticator app to manage servers.">
-      <Row label={enabled ? 'On' : account?.isAnonymous ? 'Add an email first' : 'Off'} last>
-        {enabled ? (
-          <Button title="Turn Off…" onPress={() => setConfirmOff(true)} />
-        ) : (
-          <Button kind="primary" title="Turn On…" onPress={start} disabled={account?.isAnonymous} loading={busy && !enroll} />
-        )}
-      </Row>
-      {enroll ? (
-        <Sheet title="Set Up Two-Factor Authentication" message="Scan this with an authenticator app, then enter the six-digit code it shows." onClose={() => setEnroll(null)}>
-          <View style={{ alignItems: 'center', marginBottom: 12 }}>
-            {enroll.qr ? <Image accessibilityLabel="QR code for your authenticator app" source={{ uri: enroll.qr }} style={{ width: 180, height: 180, backgroundColor: '#fff', borderRadius: 8 }} /> : null}
-            <T v="caption" color="secondary" selectable style={{ marginTop: 8 }}>
-              Or enter this key: {enroll.secret}
-            </T>
-          </View>
-          <Field label="Code" value={code} onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" onSubmitEditing={verify} error={err} />
-          <SheetButtons>
-            <Button title="Cancel" onPress={() => setEnroll(null)} />
-            <Button kind="primary" title="Turn On" onPress={verify} disabled={code.length !== 6} loading={busy} />
-          </SheetButtons>
-        </Sheet>
-      ) : null}
-      {confirmOff ? (
-        <Confirm
-          title="Turn Off Two-Factor Authentication?"
-          message="Anyone with your password could then manage your servers."
-          confirmLabel="Turn Off"
-          onCancel={() => setConfirmOff(false)}
-          onConfirm={() => {
-            setConfirmOff(false);
-            run('mfa', 'Turning off', () => b.disableMfa!(account!.mfa!.factorId));
-          }}
-        />
-      ) : null}
-    </Section>
   );
 }
 

@@ -16,7 +16,7 @@ import { ClientBackend } from './backend/client';
 import { ServerBackend } from './backend/server';
 import { DemoBackend } from './backend/demo';
 import type { Backend, SetupState } from './backend/types';
-import { navigate, setBackend, store, useApp } from './state';
+import { navigate, setBackend, store, useApp, type Route } from './state';
 import { refreshCatalog } from './catalog';
 import { useReducedMotion } from './platform';
 import { useTheme } from './theme';
@@ -142,44 +142,84 @@ function Centered({ children }: { children: React.ReactNode }) {
   return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.window, padding: 24 }}>{children}</View>;
 }
 
-/** Page transitions: a short fade and lift when you change section or open a detail page. */
+// Each page owns its entrance progress, created at 0, so neither page can flash at the wrong opacity.
+type Layer = { key: string; route: Route; dir: 'tab' | 'push' | 'pop' | 'none'; v: Animated.Value };
+const routeKey = (r: Route) => `${r.tab}:${r.detail ? JSON.stringify(r.detail) : ''}`;
+
+function screenFor(route: Route): React.ReactNode {
+  if (route.tab === 'discover' && route.detail?.kind === 'store') return <StoreDetailScreen sourceUrl={route.detail.sourceUrl} />;
+  if (route.tab === 'plugins' && route.detail?.kind === 'plugin') return <PluginDetailScreen pluginId={route.detail.pluginId} />;
+  return { home: <HomeScreen />, discover: <DiscoverScreen />, plugins: <PluginsScreen />, search: <SearchScreen />, settings: <SettingsScreen /> }[route.tab];
+}
+
+/**
+ * Page transitions. The outgoing page stays on screen while the new one arrives:
+ * opening a detail page slides it in from the right, Back slides it away, and switching
+ * sections cross-fades with a small lift. Reduce Motion keeps only the cross-fade.
+ */
 function Content() {
   const { c } = useTheme();
   const route = useApp((s) => s.route);
   const reduced = useReducedMotion();
-  const anim = useRef(new Animated.Value(1)).current;
-  const key = `${route.tab}:${route.detail ? JSON.stringify(route.detail) : ''}`;
-  const last = useRef(key);
+  const [layers, setLayers] = useState<Layer[]>(() => [{ key: routeKey(route), route, dir: 'none', v: new Animated.Value(1) }]);
+  const top = layers[layers.length - 1];
+
   useEffect(() => {
-    if (last.current !== key && !reduced) {
-      anim.setValue(0);
-      Animated.timing(anim, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-    }
-    last.current = key;
-    if (route.target) revealTarget(route.target);
+    const key = routeKey(route);
+    setLayers((ls) => {
+      const cur = ls[ls.length - 1];
+      if (cur.key === key) return [...ls.slice(0, -1), { ...cur, route }];
+      const sameTab = cur.route.tab === route.tab;
+      const dir: Layer['dir'] = sameTab && route.detail && !cur.route.detail ? 'push' : sameTab && cur.route.detail && !route.detail ? 'pop' : 'tab';
+      return [cur, { key, route, dir, v: new Animated.Value(0) }];
+    });
+    if (route.target) setTimeout(() => revealTarget(route.target!), reduced ? 0 : 200);
   }, [route.nonce]);
 
-  let screen: React.ReactNode;
-  if (route.tab === 'discover' && route.detail?.kind === 'store') screen = <StoreDetailScreen sourceUrl={route.detail.sourceUrl} />;
-  else if (route.tab === 'plugins' && route.detail?.kind === 'plugin') screen = <PluginDetailScreen pluginId={route.detail.pluginId} />;
-  else
-    screen = {
-      home: <HomeScreen />,
-      discover: <DiscoverScreen />,
-      plugins: <PluginsScreen />,
-      search: <SearchScreen />,
-      settings: <SettingsScreen />,
-    }[route.tab];
+  useEffect(() => {
+    if (layers.length < 2) return;
+    const a = Animated.timing(top.v, {
+      toValue: 1,
+      duration: reduced ? 180 : top.dir === 'tab' ? 300 : 380,
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+      useNativeDriver: false,
+    });
+    // Start after the new page has laid out and painted, so the first frames aren't lost to mounting.
+    let raf = requestAnimationFrame(() => (raf = requestAnimationFrame(() => a.start(({ finished }) => finished && setLayers((ls) => ls.slice(-1))))));
+    return () => (cancelAnimationFrame(raf), a.stop());
+  }, [top.key, layers.length]);
+
+  // The page in front fades over the one behind (both opaque), so the background never shows
+  // through mid-transition. On Back, the leaving page is the one in front.
+  const style = (entering: boolean) => {
+    const t = top.v;
+    const fadeIn = t.interpolate({ inputRange: [0, 0.65], outputRange: [0, 1], extrapolate: 'clamp' });
+    const fadeOut = t.interpolate({ inputRange: [0.35, 1], outputRange: [1, 0], extrapolate: 'clamp' });
+    const move = (from: number, to = 0, axis: 'translateX' | 'translateY' = 'translateX') => ({
+      transform: [{ [axis]: t.interpolate({ inputRange: [0, 1], outputRange: [from, to] }) } as any],
+    });
+    if (reduced || top.dir === 'none') return entering ? { opacity: fadeIn, zIndex: 2 } : { zIndex: 1 };
+    if (top.dir === 'tab') return entering ? { opacity: fadeIn, zIndex: 2, ...move(12, 0, 'translateY') } : { zIndex: 1, ...move(0, -6, 'translateY') };
+    if (top.dir === 'push') return entering ? { opacity: fadeIn, zIndex: 2, ...move(48) } : { zIndex: 1, ...move(0, -32) };
+    return entering ? { zIndex: 1, ...move(-32) } : { opacity: fadeOut, zIndex: 2, ...move(0, 48) };
+  };
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.window }} accessibilityRole={'main' as any}>
-      <View {...({ dataSet: { drag: '1' } } as any)} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 28, zIndex: 1 }} />
-      <Animated.View
-        key={key}
-        style={{ flex: 1, opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}
-      >
-        {screen}
-      </Animated.View>
+    <View style={{ flex: 1, backgroundColor: c.window, overflow: 'hidden' }} accessibilityRole={'main' as any}>
+      <View {...({ dataSet: { drag: '1' } } as any)} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 28, zIndex: 3 }} />
+      {layers.map((layer, i) => {
+        const entering = i === layers.length - 1;
+        return (
+          <Animated.View
+            key={layer.key}
+            pointerEvents={entering ? 'auto' : 'none'}
+            aria-hidden={!entering}
+            style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: c.window }, layers.length > 1 ? style(entering) : null]}
+          >
+            {screenFor(layer.route)}
+          </Animated.View>
+        );
+      })}
     </View>
   );
 }
